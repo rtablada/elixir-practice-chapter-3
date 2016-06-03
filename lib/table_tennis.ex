@@ -1,32 +1,55 @@
 defmodule Metex.TableTennis do
-  def listen_for_ping(max_hits) do
+  def listen_for_ping(skillz) do
     receive do
-      {sender, "ping", hits} when hits < max_hits ->
+      # Check if message matches format with "ping" and current volley count
+      {opponent, "ping", volley} when volley < skillz ->
         IO.puts "Heard ping"
-        send(sender, {self, "pong", hits + 1})
-        listen_for_ping(max_hits)
+        send(opponent, {self, "pong", volley + 1})
+
+        # Set the listener process back up to listen for the next hit!
+        # Without this, only one volley will ever happen
+        listen_for_ping(skillz)
+      # If the received message is anything else, setup to listen again
       _ ->
-        listen_for_ping(max_hits)
+        listen_for_ping(skillz)
     end
   end
 
-  def listen_for_pong(max_hits) do
+  def listen_for_pong(skillz) do
     receive do
-      {sender, "pong", hits} when hits < max_hits ->
+      # Check if message matches format with "pong" and current volley count
+      {opponent, "pong", volley} when volley < skillz ->
         IO.puts "Heard pong"
-        send(sender, {self, "ping", hits + 1})
-        listen_for_pong(max_hits)
+        send(opponent, {self, "ping", volley + 1})
+
+        # Set the listener process back up to listen for the next hit!
+        # Without this, only one volley will ever happen
+        listen_for_pong(skillz)
+      # If the received message is anything else, setup to listen again
       _ ->
-        listen_for_pong(max_hits)
+        listen_for_pong(skillz)
     end
   end
 
-  def start(max_hits) do
-    # loop_pid = spawn(Metex.TableTennis, :loop, [0, total_pings])
-    pinger = spawn(Metex.TableTennis, :listen_for_ping, [max_hits])
-    ponger = spawn(Metex.TableTennis, :listen_for_pong, [max_hits])
+  def start(skillz) do
+    # Spawns a process that listens for ping
+    pinger = spawn(Metex.TableTennis, :listen_for_ping, [skillz])
+    # Spawns a process that listens for pong
+    ponger = spawn(Metex.TableTennis, :listen_for_pong, [skillz])
 
-    # send(pinger, {ponger, "ping"})
+    # Sends a message to the pong listener with
+    #   - Ping listener
+    #   - Pong message
+    #   - 0 volley number
     send(ponger, {pinger, "pong", 0})
+
+    # Sends a message to the pong listener with
+    #   - Ping listener
+    #   - Pong message
+    #   - 0 volley number
+    #
+    #   This message should be pretty much ignored...
+    #   But might lead to an endless worker loop?
+    send(ponger, {pinger, "ping", 0})
   end
 end
